@@ -3,5 +3,5 @@ IndentWidth: 4
 UseTab: Never
 BreakBeforeBraces: Attach
 AllowShortFunctionsOnASingleLine: All
-SortIncludes: false
+# SortIncludes: false
 ColumnLimit: 120

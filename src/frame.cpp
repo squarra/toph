@@ -30,6 +30,11 @@ Eigen::Isometry3f Frame::worldPose() const {
     return local_pose;
 }
 
+Eigen::Matrix4f Frame::matrix() const { return local_pose.matrix(); }
+Eigen::Vector3f Frame::translation() const { return local_pose.translation(); }
+Eigen::Matrix3f Frame::rotation() const { return local_pose.rotation(); }
+Eigen::Quaternionf Frame::quaternion() const { return Eigen::Quaternionf(rotation()); }
+
 Eigen::Matrix4f Frame::worldMatrix() const { return worldPose().matrix(); }
 Eigen::Vector3f Frame::worldTranslation() const { return worldPose().translation(); }
 Eigen::Matrix3f Frame::worldRotation() const { return worldPose().rotation(); }

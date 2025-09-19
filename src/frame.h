@@ -13,6 +13,12 @@ class Frame : public std::enable_shared_from_this<Frame> {
   public:
     using Ptr = std::shared_ptr<Frame>;
 
+    std::vector<Eigen::Vector3f> vertices;
+    std::vector<Eigen::Vector3i> faces;
+    std::vector<Eigen::Vector3f> colors;
+
+    Eigen::Vector3f frameColor {1.0f, 1.0f, 1.0f};
+
     explicit Frame(std::string name, Eigen::Isometry3f X = Eigen::Isometry3f::Identity());
 
     void addChild(const Ptr &child);

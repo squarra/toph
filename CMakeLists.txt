@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(glfw3 REQUIRED)
 
-set(TOPH_SOURCES src/frame.cpp)
+set(TOPH_SOURCES src/frame.cpp src/viewer.cpp src/glad.c)
 
 add_library(toph SHARED ${TOPH_SOURCES})
 target_include_directories(toph PUBLIC include)

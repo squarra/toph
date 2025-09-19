@@ -74,12 +74,9 @@ struct GeometryGPU {
     GeometryGPU() = default;
 
     ~GeometryGPU() {
-        if (vbo)
-            glDeleteBuffers(1, &vbo);
-        if (ebo)
-            glDeleteBuffers(1, &ebo);
-        if (vao)
-            glDeleteVertexArrays(1, &vao);
+        if (vbo) glDeleteBuffers(1, &vbo);
+        if (ebo) glDeleteBuffers(1, &ebo);
+        if (vao) glDeleteVertexArrays(1, &vao);
     }
 
     GeometryGPU(const GeometryGPU &) = delete;
@@ -115,8 +112,7 @@ struct GeometryGPU {
 
 void GeometryGPU::uploadMesh(const std::vector<Eigen::Vector3f> &verts, const std::vector<Eigen::Vector3i> &faces,
                              const std::vector<Eigen::Vector3f> &colors, const Eigen::Vector3f &fallbackColor) {
-    if (verts.empty())
-        return;
+    if (verts.empty()) return;
 
     // Interleaved vertex data structure
     struct Vertex {
@@ -165,8 +161,7 @@ void GeometryGPU::uploadMesh(const std::vector<Eigen::Vector3f> &verts, const st
 }
 
 void GeometryGPU::draw() const {
-    if (!isValid())
-        return;
+    if (!isValid()) return;
     glBindVertexArray(vao);
     if (ebo) {
         glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr);
@@ -232,9 +227,7 @@ Viewer::Impl::Impl(int width, int height, const char *title) : width_(width), he
 }
 
 Viewer::Impl::~Impl() {
-    if (window_) {
-        glfwDestroyWindow(window_);
-    }
+    if (window_) { glfwDestroyWindow(window_); }
 }
 
 void Viewer::Impl::initWindow(const char *title) {
@@ -243,16 +236,12 @@ void Viewer::Impl::initWindow(const char *title) {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     window_ = glfwCreateWindow(width_, height_, title, nullptr, nullptr);
-    if (!window_) {
-        throw std::runtime_error("Failed to create GLFW window");
-    }
+    if (!window_) { throw std::runtime_error("Failed to create GLFW window"); }
     glfwMakeContextCurrent(window_);
 }
 
 void Viewer::Impl::initGraphics() {
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-        throw std::runtime_error("Failed to initialize GLAD");
-    }
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) { throw std::runtime_error("Failed to initialize GLAD"); }
     glEnable(GL_DEPTH_TEST);
     glViewport(0, 0, width_, height_);
 }
@@ -297,7 +286,6 @@ void Viewer::Impl::initCallbacks() {
 }
 
 void Viewer::Impl::initFallbackGeometry() {
-    // 3 lines for X(red), Y(green), Z(blue) axes
     const std::vector<Eigen::Vector3f> verts = {
         {0, 0, 0}, {1, 0, 0}, // X
         {0, 0, 0}, {0, 1, 0}, // Y
@@ -316,6 +304,9 @@ void Viewer::Impl::addFrame(const Frame::Ptr &frame) {
     GeometryGPU gpuMesh;
     gpuMesh.uploadMesh(frame->vertices, frame->faces, frame->colors, frame->frameColor);
     gpuMeshes_.push_back(std::move(gpuMesh));
+    for (const auto &child : frame->children()) {
+        addFrame(child);
+    }
 }
 
 void Viewer::Impl::handleWindowInput() {
@@ -325,8 +316,7 @@ void Viewer::Impl::handleWindowInput() {
 }
 
 void Viewer::Impl::onCursorMove(double xpos, double ypos) {
-    if (!isLeftMouseDown_ && !isRightMouseDown_)
-        return;
+    if (!isLeftMouseDown_ && !isRightMouseDown_) return;
 
     const double dx = xpos - lastMouseX_;
     const double dy = ypos - lastMouseY_;
@@ -354,10 +344,8 @@ void Viewer::Impl::onCursorMove(double xpos, double ypos) {
 }
 
 void Viewer::Impl::onMouseButton(int button, int action) {
-    if (button == GLFW_MOUSE_BUTTON_LEFT)
-        isLeftMouseDown_ = (action == GLFW_PRESS);
-    if (button == GLFW_MOUSE_BUTTON_RIGHT)
-        isRightMouseDown_ = (action == GLFW_PRESS);
+    if (button == GLFW_MOUSE_BUTTON_LEFT) isLeftMouseDown_ = (action == GLFW_PRESS);
+    if (button == GLFW_MOUSE_BUTTON_RIGHT) isRightMouseDown_ = (action == GLFW_PRESS);
     glfwGetCursorPos(window_, &lastMouseX_, &lastMouseY_);
 }
 
@@ -414,9 +402,7 @@ void Viewer::Impl::run() {
 // --- Public Viewer API (forwarding to PIMPL) --------------------------------
 
 Viewer::Viewer(int w, int h, const char *t) {
-    if (!glfwInit()) {
-        throw std::runtime_error("Failed to initialize GLFW");
-    }
+    if (!glfwInit()) { throw std::runtime_error("Failed to initialize GLFW"); }
     pimpl_ = std::make_unique<Impl>(w, h, t);
 }
 
@@ -425,7 +411,7 @@ Viewer::~Viewer() {
     glfwTerminate();
 }
 
-void Viewer::addFrame(const Frame::Ptr &frame) { pimpl_->addFrame(frame); }
+void Viewer::addFrame(Frame::Ptr frame) { pimpl_->addFrame(std::move(frame)); }
 
 void Viewer::run() { pimpl_->run(); }
 

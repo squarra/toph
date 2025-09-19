@@ -14,7 +14,7 @@ class Viewer {
     Viewer(const Viewer &) = delete;
     Viewer &operator=(const Viewer &) = delete;
 
-    void addFrame(const Frame::Ptr &frame);
+    void addFrame(Frame::Ptr frame);
 
     void run();
 

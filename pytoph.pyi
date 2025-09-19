@@ -13,6 +13,8 @@ class Frame:
         """add_child(self: pytoph.Frame, child: pytoph.Frame) -> None"""
     def rotate(self, arg0) -> None:
         """rotate(self: pytoph.Frame, arg0: Eigen::AngleAxis<float>) -> None"""
+    def show(self) -> None:
+        """show(self: pytoph.Frame) -> None"""
     def translate(self, arg0: numpy.ndarray[numpy.float32[3, 1]]) -> None:
         """translate(self: pytoph.Frame, arg0: numpy.ndarray[numpy.float32[3, 1]]) -> None"""
     @property

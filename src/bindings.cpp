@@ -2,7 +2,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "frame.h" //
+#include "frame.h"
+#include "viewer.h"
 
 namespace py = pybind11;
 using namespace toph;
@@ -62,6 +63,13 @@ PYBIND11_MODULE(pytoph, m) {
 
         .def("translate", [](Frame &f, const Eigen::Vector3f &delta) { f.mutableX().pretranslate(delta); })
         .def("rotate", [](Frame &f, const Eigen::AngleAxisf &aa) { f.mutableX().rotate(aa); })
+
+        .def("show",
+             [](Frame::Ptr &self) {
+                 Viewer v;
+                 v.addFrame(self);
+                 v.run();
+             })
 
         .def("__repr__", &Frame::to_string);
 }

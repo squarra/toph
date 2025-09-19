@@ -1,35 +1,43 @@
 #pragma once
 
-#include <Eigen/Core>
 #include <Eigen/Geometry>
-#include <array>
-#include <iostream>
 #include <memory>
+#include <ostream>
 #include <sstream>
 #include <string>
 #include <vector>
 
 namespace toph {
 
-struct Frame {
-    Frame();
-    Frame(const std::string &name);
-    Frame(const std::string &name, Frame *parent);
+class Frame : public std::enable_shared_from_this<Frame> {
+  public:
+    using Ptr = std::shared_ptr<Frame>;
 
-    std::string name;
-    Frame *parent = nullptr;
-    std::vector<std::shared_ptr<Frame>> children;
+    explicit Frame(std::string name, Eigen::Isometry3f X = Eigen::Isometry3f::Identity());
 
-    std::shared_ptr<Frame> addChild(std::shared_ptr<Frame> child);
+    void addChild(const Ptr &child);
+    Ptr parent() const;
+    const std::vector<Ptr> &children() const noexcept;
 
-    std::vector<Eigen::Vector3f> vertices;
-    std::vector<std::array<unsigned int, 3>> faces;
+    const std::string &name() const noexcept { return name_; }
+    void setName(const std::string &n) { name_ = n; }
 
-    Eigen::Isometry3f pose = Eigen::Isometry3f::Identity();
-    Eigen::Isometry3f worldPose() const;
+    const Eigen::Isometry3f &X() const noexcept { return X_; }
+    Eigen::Isometry3f& mutableX() noexcept { return X_; }
+    void setX(const Eigen::Isometry3f &x) { X_ = x; }
+
+    Eigen::Isometry3f worldX() const;
 
     std::string to_string() const;
-    friend std::ostream &operator<<(std::ostream &os, const Frame &frame);
+
+  private:
+    std::string name_;
+    Eigen::Isometry3f X_;
+
+    std::weak_ptr<Frame> parent_;
+    std::vector<Ptr> children_;
 };
+
+std::ostream &operator<<(std::ostream &os, const Frame &frame);
 
 } // namespace toph

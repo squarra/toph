@@ -1,24 +1,32 @@
 #include "frame.h"
-#include <string>
 
 namespace toph {
 
-Frame::Frame() {}
-Frame::Frame(const std::string &name) : name(name) {}
-Frame::Frame(const std::string &name, Frame *parent) : name(name), parent(parent) {}
+Frame::Frame(std::string name, Eigen::Isometry3f X) : name_(std::move(name)), X_(std::move(X)) {}
 
-std::shared_ptr<Frame> Frame::addChild(std::shared_ptr<Frame> child) {
-    child->parent = this;
-    children.push_back(child);
-    return child;
+void Frame::addChild(const Frame::Ptr &child) {
+    if (!child)
+        return;
+    child->parent_ = weak_from_this();
+    children_.push_back(child);
 }
 
-Eigen::Isometry3f Frame::worldPose() const { return parent ? parent->worldPose() * pose : pose; }
+Frame::Ptr Frame::parent() const { return parent_.lock(); }
+
+const std::vector<Frame::Ptr> &Frame::children() const noexcept { return children_; }
+
+Eigen::Isometry3f Frame::worldX() const {
+    if (auto p = parent_.lock()) {
+        return p->worldX() * X_;
+    }
+    return X_;
+}
 
 std::string Frame::to_string() const {
-    std::string parent_name = parent ? parent->name : "None";
+    auto p = parent_.lock();
+    const std::string parent_name = p ? p->name_ : "None";
     std::stringstream ss;
-    ss << "Frame(name=" << name << ", parent=" << parent_name << ", children=" << children.size() << ")";
+    ss << "Frame(name=" << name_ << ", parent=" << parent_name << ", children=" << children_.size() << ")";
     return ss.str();
 }
 

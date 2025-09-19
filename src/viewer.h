@@ -1,4 +1,5 @@
 #pragma once
+
 #include "frame.h"
 #include <memory>
 #include <vector>
@@ -10,13 +11,16 @@ class Viewer {
     Viewer(int width = 800, int height = 600, const char *title = "Toph Viewer");
     ~Viewer();
 
+    Viewer(const Viewer &) = delete;
+    Viewer &operator=(const Viewer &) = delete;
+
     void addFrame(const Frame::Ptr &frame);
 
-    void run(); // main loop
+    void run();
 
   private:
     struct Impl;
-    std::unique_ptr<Impl> impl_;
+    std::unique_ptr<Impl> pimpl_;
 };
 
 } // namespace toph

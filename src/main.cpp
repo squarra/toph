@@ -30,6 +30,8 @@
 int main() {
     using namespace toph;
     auto root = std::make_shared<Frame>("root");
+    auto box = Frame::Cube("box", {1.0f, 1.0f, 0.5f});
+    root->addChild(box);
     Viewer v;
     v.addFrame(root);
     v.run();

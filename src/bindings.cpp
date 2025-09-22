@@ -65,7 +65,7 @@ PYBIND11_MODULE(pytoph, m) {
         .def("rotate", [](Frame &f, const Eigen::AngleAxisf &aa) { f.mutableX().rotate(aa); })
 
         .def("show",
-             [](Frame::Ptr &self) {
+             [](const Frame::Ptr &self) {
                  Viewer v;
                  v.addFrame(self);
                  v.run();

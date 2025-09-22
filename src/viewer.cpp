@@ -41,28 +41,51 @@ inline Eigen::Matrix4f lookAt(const Eigen::Vector3f &eye, const Eigen::Vector3f 
 }
 
 constexpr char VERTEX_SHADER_SRC[] = R"(
-  #version 330 core
-  layout(location=0) in vec3 a_position;
-  layout(location=1) in vec3 a_color;
+#version 330 core
+layout(location=0) in vec3 a_position;
+layout(location=1) in vec3 a_color;
+layout(location=2) in vec3 a_normal;
 
-  out vec3 v_color;
+out vec3 v_color;
+out vec3 v_normal;
+out vec3 v_worldPos;
 
-  uniform mat4 u_modelViewProjection;
+uniform mat4 u_model;
+uniform mat4 u_view;
+uniform mat4 u_proj;
 
-  void main() {
+void main() {
+    vec4 worldPos = u_model * vec4(a_position, 1.0);
+    v_worldPos = worldPos.xyz;
+    v_normal = mat3(transpose(inverse(u_model))) * a_normal;
     v_color = a_color;
-    gl_Position = u_modelViewProjection * vec4(a_position, 1.0);
-  }
+    gl_Position = u_proj * u_view * worldPos;
+}
 )";
 
 constexpr char FRAGMENT_SHADER_SRC[] = R"(
-  #version 330 core
-  in vec3 v_color;
-  out vec4 FragColor;
+#version 330 core
+in vec3 v_color;
+in vec3 v_normal;
+in vec3 v_worldPos;
 
-  void main() {
-    FragColor = vec4(v_color, 1.0);
-  }
+out vec4 FragColor;
+
+uniform vec3 u_lightPos;
+uniform vec3 u_viewPos;
+
+void main() {
+    vec3 N = normalize(v_normal);
+    vec3 L = normalize(u_lightPos - v_worldPos);
+    vec3 V = normalize(u_viewPos - v_worldPos);
+
+    float diff = max(dot(N, L), 0.0);
+
+    vec3 ambient = 0.2 * v_color;
+    vec3 diffuse = diff * v_color;
+
+    FragColor = vec4(ambient + diffuse, 1.0);
+}
 )";
 
 struct GeometryGPU {
@@ -114,16 +137,32 @@ void GeometryGPU::uploadMesh(const std::vector<Eigen::Vector3f> &verts, const st
                              const std::vector<Eigen::Vector3f> &colors, const Eigen::Vector3f &fallbackColor) {
     if (verts.empty()) return;
 
-    // Interleaved vertex data structure
     struct Vertex {
         Eigen::Vector3f pos;
         Eigen::Vector3f color;
+        Eigen::Vector3f normal;
     };
 
-    std::vector<Vertex> vertexData;
-    vertexData.reserve(verts.size());
+    std::vector<Vertex> vertexData(verts.size());
     for (size_t i = 0; i < verts.size(); ++i) {
-        vertexData.push_back({verts[i], (i < colors.size()) ? colors[i] : fallbackColor});
+        vertexData[i].pos = verts[i];
+        vertexData[i].color = (i < colors.size()) ? colors[i] : fallbackColor;
+        vertexData[i].normal = Eigen::Vector3f::Zero();
+    }
+
+    // Compute normals (flat shading averaged per-vertex)
+    for (auto &f : faces) {
+        Eigen::Vector3f v0 = verts[f.x()];
+        Eigen::Vector3f v1 = verts[f.y()];
+        Eigen::Vector3f v2 = verts[f.z()];
+        Eigen::Vector3f n = (v1 - v0).cross(v2 - v0).normalized();
+        vertexData[f.x()].normal += n;
+        vertexData[f.y()].normal += n;
+        vertexData[f.z()].normal += n;
+    }
+    for (auto &v : vertexData) {
+        if (v.normal.norm() > 0.0f) v.normal.normalize();
+        else v.normal = Eigen::Vector3f(0, 0, 1);
     }
 
     std::vector<unsigned int> indexData;
@@ -141,13 +180,14 @@ void GeometryGPU::uploadMesh(const std::vector<Eigen::Vector3f> &verts, const st
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glBufferData(GL_ARRAY_BUFFER, vertexData.size() * sizeof(Vertex), vertexData.data(), GL_STATIC_DRAW);
 
-    // Position attribute
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, pos));
     glEnableVertexAttribArray(0);
 
-    // Color attribute
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, color));
     glEnableVertexAttribArray(1);
+
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, normal));
+    glEnableVertexAttribArray(2);
 
     if (!indexData.empty()) {
         glGenBuffers(1, &ebo);
@@ -169,8 +209,6 @@ void GeometryGPU::draw() const {
         glDrawArrays(GL_LINES, 0, indexCount); // Assuming non-indexed are lines
     }
 }
-
-// --- Viewer Implementation (PIMPL) ------------------------------------------
 
 struct Viewer::Impl {
     // Window and rendering state
@@ -370,7 +408,11 @@ void Viewer::Impl::calculateViewProjectionMatrices(Eigen::Matrix4f &view, Eigen:
 }
 
 void Viewer::Impl::run() {
-    GLint mvpLocation = glGetUniformLocation(shaderProgram_, "u_modelViewProjection");
+    GLint modelLoc = glGetUniformLocation(shaderProgram_, "u_model");
+    GLint viewLoc = glGetUniformLocation(shaderProgram_, "u_view");
+    GLint projLoc = glGetUniformLocation(shaderProgram_, "u_proj");
+    GLint lightPosLoc = glGetUniformLocation(shaderProgram_, "u_lightPos");
+    GLint viewPosLoc = glGetUniformLocation(shaderProgram_, "u_viewPos");
 
     while (!glfwWindowShouldClose(window_)) {
         handleWindowInput();
@@ -378,14 +420,23 @@ void Viewer::Impl::run() {
         Eigen::Matrix4f viewMatrix, projectionMatrix;
         calculateViewProjectionMatrices(viewMatrix, projectionMatrix);
 
+        Eigen::Vector3f eye;
+        eye.x() = cameraTarget_.x() + cameraDistance_ * std::cos(cameraPitch_) * std::cos(cameraYaw_);
+        eye.y() = cameraTarget_.y() + cameraDistance_ * std::cos(cameraPitch_) * std::sin(cameraYaw_);
+        eye.z() = cameraTarget_.z() + cameraDistance_ * std::sin(cameraPitch_);
+
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glUseProgram(shaderProgram_);
 
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, viewMatrix.data());
+        glUniformMatrix4fv(projLoc, 1, GL_FALSE, projectionMatrix.data());
+        glUniform3fv(lightPosLoc, 1, Eigen::Vector3f(5.0f, 5.0f, 5.0f).data());
+        glUniform3fv(viewPosLoc, 1, eye.data());
+
         for (size_t i = 0; i < frames_.size(); ++i) {
             Eigen::Matrix4f modelMatrix = frames_[i]->worldX().matrix();
-            Eigen::Matrix4f mvp = projectionMatrix * viewMatrix * modelMatrix;
-            glUniformMatrix4fv(mvpLocation, 1, GL_FALSE, mvp.data());
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, modelMatrix.data());
 
             if (gpuMeshes_[i].isValid()) {
                 gpuMeshes_[i].draw();
@@ -398,8 +449,6 @@ void Viewer::Impl::run() {
         glfwPollEvents();
     }
 }
-
-// --- Public Viewer API (forwarding to PIMPL) --------------------------------
 
 Viewer::Viewer(int w, int h, const char *t) {
     if (!glfwInit()) { throw std::runtime_error("Failed to initialize GLFW"); }

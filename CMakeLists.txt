@@ -11,7 +11,7 @@ find_package(glfw3 REQUIRED)
 set(TOPH_SOURCES src/frame.cpp src/viewer.cpp src/glad.c)
 
 add_library(toph SHARED ${TOPH_SOURCES})
-target_include_directories(toph PUBLIC include)
+  target_include_directories(toph PUBLIC include)
 target_link_libraries(toph PRIVATE glfw)
 
 if(USE_PYBIND)
